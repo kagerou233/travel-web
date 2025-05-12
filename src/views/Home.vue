@@ -33,8 +33,12 @@
           <div v-loading="loading" class="table-container">
             <el-table :data="filteredTravelNotes" style="width: 100%">
               <el-table-column prop="title" label="标题" min-width="300" />
-              <el-table-column prop="author" label="作者" min-width="120" />
-              <el-table-column prop="createTime" label="发布时间" min-width="180" />
+              <el-table-column prop="User.username" label="作者" min-width="120" />
+              <el-table-column prop="created_at" label="发布时间" min-width="180">
+                <template #default="{ row }">
+                  {{ formatDateTime(row.created_at) }}
+                </template>
+              </el-table-column>
               <el-table-column prop="status" label="状态" min-width="100">
                 <template #default="{ row }">
                   <el-tag :type="getStatusType(row.status)">
@@ -142,7 +146,8 @@ const handleLogout = () => {
 
 const handleApprove = async (note) => {
   try {
-    await travelNotesStore.approveNote(note.id)
+    
+    await travelNotesStore.approveNote(note.note_id)
     ElMessage.success('审核通过成功')
   } catch (error) {
     ElMessage.error('操作失败：' + error.message)
@@ -151,7 +156,7 @@ const handleApprove = async (note) => {
 
 const handleReject = (note) => {
   rejectForm.value = {
-    noteId: note.id,
+    noteId: note.note_id,
     reason: ''
   }
   rejectDialogVisible.value = true
@@ -186,6 +191,11 @@ const handleDelete = async (note) => {
       ElMessage.error('删除失败：' + error.message)
     }
   }
+}
+
+const formatDateTime = (isoString) => {
+  const date = new Date(isoString);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 const getStatusType = (status) => {
@@ -294,4 +304,4 @@ const getStatusText = (status) => {
 :deep(.el-main::-webkit-scrollbar-track) {
   background-color: #f5f7fa;
 }
-</style> 
+</style>
