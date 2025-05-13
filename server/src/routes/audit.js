@@ -6,32 +6,35 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const RejectReason = require('../models/RejectReason');
-
-
+const image = require('../models/image');
+const RecycleBin = require('../models/RecycleBin'); 
 
 
 // 获取所有游记
 router.get('/allTravelNotes', async (req, res) => {
   try {
-    const { page = 1, pageSize = 10 } = req.query;
+   
     
     const notes = await TravelNote.findAndCountAll({
       
       order: [['created_at', 'DESC']],
-      limit: parseInt(pageSize),
-      offset: (parseInt(page) - 1) * parseInt(pageSize),
+      
       include: [{
         model: User,
         attributes: ['username', 'avatar_url']
-      }]
+      },
+      {
+        model: image,
+        attributes: ['url']
+      },
+    ]
     });
     res.json({
       success: true,
       data: {
         total: notes.count,
         list: notes.rows,
-        currentPage: parseInt(page),
-        pageSize: parseInt(pageSize)
+        
       }
     });
   } catch (error) {
@@ -42,39 +45,7 @@ router.get('/allTravelNotes', async (req, res) => {
     });
   }
 });
-// 获取图片
-router.get('/getNoteImages/:note_id', async (req, res) => {
-  try {
-    const { note_id } = req.params;
-    const images = await image.findAll({
-      where: {
-        note_id: note_id
-      }
-    });
 
-    if (!images || images.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '未找到相关图片'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        imageInfo: {
-          avatar: images
-        }
-      }
-    });
-  } catch (error) {
-    console.error('获取游记图片失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取游记图片失败'
-    });
-  }
-});
 
 
 
@@ -117,6 +88,46 @@ router.post('/updateNoteStatus/:note_id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '更新游记状态失败'
+    });
+  }
+});
+
+// 删除游记并移动到回收站
+router.post('/deleteNote/:note_id', async (req, res) => {
+  try {
+    const { note_id } = req.params;
+      // 查询原数据
+      const note = await TravelNote.findOne({
+        where: { note_id },
+      });
+      
+      if (!note) {
+        return res.status(404).json({
+          success: false,
+          message: '未找到指定游记'
+        });
+      }
+      
+      // 插入到回收站
+      await RecycleBin.create({
+        ...note.dataValues,
+        deleted_at: new Date()
+      });
+      
+      // 从原表删除
+      await TravelNote.destroy({
+        where: { note_id },
+      });
+      res.json({
+        success: true,
+        message: '游记已删除并移动到回收站'
+      });
+    
+  } catch (error) {
+    console.error('删除游记失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '删除游记失败'
     });
   }
 });
