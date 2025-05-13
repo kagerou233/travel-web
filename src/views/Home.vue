@@ -32,7 +32,17 @@
         <el-main>
           <div v-loading="loading" class="table-container">
             <el-table :data="filteredTravelNotes" style="width: 100%">
-              <el-table-column prop="title" label="标题" min-width="300" />
+              <el-table-column prop="title" label="标题" min-width="300">
+                <template #default="{ row }">
+                  <el-button 
+                    link 
+                    type="primary" 
+                    @click="handlePreview(row)"
+                  >
+                    {{ row.title }}
+                  </el-button>
+                </template>
+              </el-table-column>
               <el-table-column prop="User.username" label="作者" min-width="120" />
               <el-table-column prop="created_at" label="发布时间" min-width="180">
                 <template #default="{ row }">
@@ -105,6 +115,60 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 添加预览对话框 -->
+    <el-dialog
+      v-model="previewVisible"
+      :title="currentPreviewNote?.title"
+      width="60%"
+      class="preview-dialog"
+      @close="handlePreviewClose"
+    >
+      <div class="preview-content">
+        <div class="preview-header">
+          <div class="author-info">
+            <span class="author-name">作者：{{ currentPreviewNote?.User?.username }}</span>
+          </div>
+          <div class="publish-time">
+            发布时间：{{ formatDateTime(currentPreviewNote?.created_at) }}
+          </div>
+        </div>
+        <div class="preview-body">
+          <div class="content-title">游记内容：</div>
+          <div class="content-text">{{ currentPreviewNote?.content }}</div>
+          <div v-if="currentPreviewNote?.images?.length" class="content-images">
+            <div class="images-title">游记图片：</div>
+            <div class="images-container">
+              <div 
+                v-for="(url, index) in currentPreviewNote.images" 
+                :key="index"
+                class="image-wrapper"
+                @click="handleImagePreview(index)"
+              >
+                <img
+                  :src="url"
+                  class="preview-image"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="preview-footer">
+          <el-tag :type="getStatusType(currentPreviewNote?.status)">
+            {{ getStatusText(currentPreviewNote?.status) }}
+          </el-tag>
+        </div>
+      </div>
+    </el-dialog>
+
+    <el-image-viewer
+      v-if="showViewer"
+      :url-list="currentPreviewNote?.images || []"
+      :initial-index="previewImageIndex"
+      @close="showViewer = false"
+      :hide-on-click-modal="false"
+      :z-index="3000"
+    />
   </div>
 </template>
 
@@ -113,7 +177,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useTravelNotesStore } from '../stores/travelNotes'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import { Clock, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -130,6 +194,12 @@ const rejectForm = ref({
   noteId: null,
   reason: ''
 })
+
+const previewVisible = computed(() => travelNotesStore.previewVisible)
+const currentPreviewNote = computed(() => travelNotesStore.currentPreviewNote)
+
+const showViewer = ref(false)
+const previewImageIndex = ref(0)
 
 onMounted(async () => {
   await travelNotesStore.fetchTravelNotes()
@@ -191,6 +261,19 @@ const handleDelete = async (note) => {
       ElMessage.error('删除失败：' + error.message)
     }
   }
+}
+
+const handlePreview = (note) => {
+  travelNotesStore.showPreview(note)
+}
+
+const handlePreviewClose = () => {
+  travelNotesStore.closePreview()
+}
+
+const handleImagePreview = (index) => {
+  previewImageIndex.value = index
+  showViewer.value = true
 }
 
 const formatDateTime = (isoString) => {
@@ -304,4 +387,110 @@ const getStatusText = (status) => {
 :deep(.el-main::-webkit-scrollbar-track) {
   background-color: #f5f7fa;
 }
+
+.preview-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+}
+
+.preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.author-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.author-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.publish-time {
+  color: #909399;
+  font-size: 14px;
+}
+
+.preview-body {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #303133;
+  min-height: 200px;
+}
+
+.content-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.content-text {
+  white-space: pre-wrap;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.preview-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 15px;
+  border-top: 1px solid #ebeef5;
+}
+
+.content-images {
+  margin-top: 20px;
+}
+
+.images-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.images-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.image-wrapper {
+  width: 200px;
+  height: 150px;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.3s;
+  background-color: #f5f7fa;
+}
+
+.image-wrapper:hover {
+  transform: scale(1.05);
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 移除之前的预览相关样式 */
 </style>
